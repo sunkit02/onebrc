@@ -2,8 +2,8 @@
 
 This is an attempt at the [one billion row challenge](https://github.com/gunnarmorling/1brc) but in rust.
 
-All the following attempts were ran on my personal laptop, a Dell XPS 15 9510.
-With the following specs:
+All the following attempts were ran on my personal laptop, a Dell XPS 15 9510,
+in AC mode and with the following specs:
 
 - OS: Arch Linux x86_64, kernel: 6.6.32-1-lts
 - CPU: Intel Core i7-11800H
