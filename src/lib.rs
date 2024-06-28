@@ -1,3 +1,4 @@
+use core::f64;
 use std::{
     collections::HashMap,
     fs::File,
@@ -21,6 +22,17 @@ pub struct StationAggregateTmp {
     max: f64,
     total: f64,
     count: u64,
+}
+
+impl Default for StationAggregateTmp {
+    fn default() -> Self {
+        Self {
+            min: f64::MAX,
+            max: f64::MIN,
+            total: 0f64,
+            count: 0,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -56,19 +68,9 @@ pub fn parse_lines<R: Read>(mut reader: BufReader<R>) -> Vec<StationAggregate> {
         let name = &buf[..split_idx];
         let temp = parse_float_limited(&buf[split_idx + 1..bytes_read - 1]);
 
-        if !results.contains_key(name.as_ref()) {
-            results.insert(
-                name.to_vec(),
-                StationAggregateTmp {
-                    min: temp,
-                    max: temp,
-                    total: 0f64,
-                    count: 0,
-                },
-            );
-        }
-
-        let entry = results.get_mut(name).unwrap();
+        let entry = results
+            .entry(name.to_vec())
+            .or_insert_with(StationAggregateTmp::default);
 
         if temp < entry.min {
             entry.min = temp;

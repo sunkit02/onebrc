@@ -196,6 +196,79 @@ fn parse_float_limited(bytes: &[u8]) -> f64 {
 pub fn parse_lines<R: Read>(mut reader: BufReader<R>) -> Vec<StationAggregate> {
     <unchanged>
         let temp = parse_float_limited(&buf[split_idx + 1..bytes_read - 1]);
-    <unchanded>
+    <unchanged>
+}
+```
+
+### Avoid hashing the station name twice (time: ~68 secs)
+
+In the flamegraph I noticed that a lot of time was spent accessing the
+`HashMap`, so I tried using the Entry API which allows me to only hash the
+station name once for every line.
+
+```rust
+impl Default for StationAggregateTmp {
+    fn default() -> Self {
+        Self {
+            min: f64::MAX,
+            max: f64::MIN,
+            total: 0f64,
+            count: 0,
+        }
+    }
+}
+
+pub fn parse_lines<R: Read>(mut reader: BufReader<R>) -> Vec<StationAggregate> {
+    let mut results = HashMap::new();
+
+    let mut buf = Vec::with_capacity(MAX_LINE_LEN);
+
+    loop {
+        let bytes_read = reader
+            .read_until(b'\n', &mut buf)
+            .expect("failed to read from BufReader");
+
+        if bytes_read == 0 {
+            break;
+        }
+
+        let mut split_idx = 0;
+        loop {
+            if buf[split_idx] == b';' {
+                break;
+            }
+            split_idx += 1;
+        }
+
+        let name = &buf[..split_idx];
+        let temp = parse_float_limited(&buf[split_idx + 1..bytes_read - 1]);
+
+        let entry = results
+            .entry(name.to_vec())
+            .or_insert_with(StationAggregateTmp::default);
+
+        if temp < entry.min {
+            entry.min = temp;
+        } else if temp > entry.max {
+            entry.max = temp;
+        }
+        entry.total += temp;
+        entry.count += 1;
+
+        buf.clear();
+    }
+
+    let mut results = results
+        .into_iter()
+        .map(|(name, aggregate)| StationAggregate {
+            name: unsafe { String::from_utf8_unchecked(name) },
+            min: aggregate.min,
+            max: aggregate.max,
+            mean: aggregate.total / aggregate.count as f64,
+        })
+        .collect::<Vec<_>>();
+
+    results.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
+    results
 }
 ```
