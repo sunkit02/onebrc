@@ -8,20 +8,94 @@ use std::{
     time::Instant,
 };
 
+const BUFFER_SIZE: usize = 3 * 1024;
+
 fn main() {
-    // println!();
-    // let start = Instant::now();
-    // count_lines_read_line(PathBuf::from_str("./data/measurements.txt").unwrap());
-    // println!("count_lines_read_line: {:?}", start.elapsed());
+    let path = parse_file_path();
 
-    // let start = Instant::now();
-    // count_lines_read_to_buf(PathBuf::from_str("./data/measurements.txt").unwrap());
-    // println!("count_lines_read_to_buf: {:?}", start.elapsed());
+    let file = File::open(path).unwrap();
+    let reader = BufReader::with_capacity(BUFFER_SIZE, file);
 
-    println!();
     let start = Instant::now();
-    count_lines_concurrent(PathBuf::from_str("./data/measurements.txt").unwrap(), 32);
-    println!("count_lines_concurrent: {:?}", start.elapsed());
+
+    let _results = parse_lines(reader);
+
+    println!("Took: {:?}", start.elapsed());
+}
+
+struct StationAggregateTmp {
+    min: f64,
+    max: f64,
+    total: f64,
+    count: u64,
+}
+
+#[derive(Debug, PartialEq)]
+struct StationAggregate {
+    name: String,
+    min: f64,
+    max: f64,
+    mean: f64,
+}
+
+fn parse_lines<R: Read>(reader: BufReader<R>) -> Vec<StationAggregate> {
+    let mut results = HashMap::new();
+
+    for line in reader.lines() {
+        let line = line.unwrap();
+
+        let (name, temp) = line
+            .split_once(';')
+            .map(|(name, temp)| (name.to_owned(), temp.parse().unwrap()))
+            .unwrap();
+
+        let entry = results.entry(name).or_insert(StationAggregateTmp {
+            min: temp,
+            max: temp,
+            total: 0f64,
+            count: 0,
+        });
+
+        if temp < entry.min {
+            entry.min = temp;
+        } else if temp > entry.max {
+            entry.max = temp;
+        }
+        entry.total += temp;
+        entry.count += 1;
+    }
+
+    let mut results = results
+        .into_iter()
+        .map(|(name, aggregate)| StationAggregate {
+            name,
+            min: aggregate.min,
+            max: aggregate.max,
+            mean: aggregate.total / aggregate.count as f64,
+        })
+        .collect::<Vec<_>>();
+
+    results.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
+    results
+}
+
+const USAGE_MSG: &str = "Usage: onebrc <data file path>";
+
+fn parse_file_path() -> PathBuf {
+    let args = std::env::args().collect::<Vec<String>>();
+    let path_str = match args.len() {
+        1 => {
+            eprintln!("{}", USAGE_MSG);
+            std::process::exit(1);
+        }
+        2 => &args[1],
+        _ => {
+            eprintln!("{}", USAGE_MSG);
+            std::process::exit(1);
+        }
+    };
+
+    PathBuf::from_str(path_str).expect("Failed to parse file path.")
 }
 
 fn count_lines_read_to_buf(path: PathBuf) {
@@ -109,4 +183,58 @@ fn count_lines_concurrent(path: PathBuf, threads: usize) {
         "lines {lines} + remaining {remaining} = {}",
         lines + remaining
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+    use std::io::Cursor;
+
+    use super::*;
+
+    #[test]
+    // Just a little test to add some confidence to the results' correctness
+    fn can_parse_lines() {
+        let input = r#"station1;99.9
+station3;23.0
+station1;-67.4
+station1;-55.8
+station2;43.3
+station2;81.8
+station3;-82.2
+station2;10.1
+station3;-99.9
+"#;
+
+        let reader = BufReader::new(Cursor::new(input));
+        let mut results = parse_lines(reader);
+
+        // Round the means to side-step the floating point number imprecision issue
+        results
+            .iter_mut()
+            .for_each(|result| result.mean = result.mean.round());
+
+        let expected = [
+            StationAggregate {
+                name: "station1".to_owned(),
+                min: -67.4,
+                max: 99.9,
+                mean: -8.0,
+            },
+            StationAggregate {
+                name: "station2".to_owned(),
+                min: 10.1,
+                max: 81.8,
+                mean: 45.0,
+            },
+            StationAggregate {
+                name: "station3".to_owned(),
+                min: -99.9,
+                max: 23.0,
+                mean: -53.0,
+            },
+        ];
+
+        assert_eq!(results, expected);
+    }
 }
