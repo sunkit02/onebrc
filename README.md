@@ -76,3 +76,80 @@ thought it would be.
 ```rust
 const BUFFER_SIZE: usize = 1024 * 1024;
 ```
+
+### Custom parsing of station name (time: ~88 secs)
+
+The idea here is to minimize the overhead caused by ut8 string validation and
+unnecessary copying of the station name. So instead of using the convenient
+`lines` method on `BufReader` which produces an iterator over '\n' delimited
+lines, I am using the `read_until` '\n' to avoid the bytes to ut8 string conversion
+overhead. I also avoided copying the station name on each `HashMap` access
+and only doing the copy when encountering the station name for the first time.
+
+```rust
+fn parse_lines<R: Read>(mut reader: BufReader<R>) -> Vec<StationAggregate> {
+    let mut results = HashMap::new();
+
+    let mut buf = Vec::with_capacity(MAX_LINE_LEN);
+
+    loop {
+        let bytes_read = reader
+            .read_until(b'\n', &mut buf)
+            .expect("failed to read from BufReader");
+
+        if bytes_read == 0 {
+            break;
+        }
+
+        let mut split_idx = 0;
+        loop {
+            if buf[split_idx] == b';' {
+                break;
+            }
+            split_idx += 1;
+        }
+
+        let name = &buf[..split_idx];
+        let temp = String::from_utf8_lossy(&buf[split_idx + 1..bytes_read - 1])
+            .parse()
+            .expect("failed to parse temp");
+
+        if !results.contains_key(name.as_ref()) {
+            results.insert(
+                name.to_vec(),
+                StationAggregateTmp {
+                    min: temp,
+                    max: temp,
+                    total: 0f64,
+                    count: 0,
+                },
+            );
+        }
+
+        let entry = results.get_mut(name).unwrap();
+
+        if temp < entry.min {
+            entry.min = temp;
+        } else if temp > entry.max {
+            entry.max = temp;
+        }
+        entry.total += temp;
+        entry.count += 1;
+
+        buf.clear();
+    }
+
+    let mut results = results
+        .into_iter()
+        .map(|(name, aggregate)| StationAggregate {
+            name: unsafe { String::from_utf8_unchecked(name) },
+            min: aggregate.min,
+            max: aggregate.max,
+            mean: aggregate.total / aggregate.count as f64,
+        })
+        .collect::<Vec<_>>();
+
+    results.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
+    results
+}
+```

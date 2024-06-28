@@ -8,3 +8,14 @@ rayon = "1.10.0"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
+criterion = { version = "0.4", features = ["html_reports"] }
+
+[[bench]]
+name = "parse_lines"
+harness = false
+
+[profile.bench]
+debug = true
+
+[profile.release]
+debug = true
