@@ -153,3 +153,49 @@ fn parse_lines<R: Read>(mut reader: BufReader<R>) -> Vec<StationAggregate> {
     results
 }
 ```
+
+### Custom parsing (very bad) of floats (time: ~79 secs)
+
+Since we know that the maximum and minimum values of the temperature for all
+entries, we can create a custom parsing function for it. Here I have created a
+very bad implementation of it but it still managed to sqeeze out a bit of extra
+performance.
+
+```rust
+#[inline]
+fn parse_float_limited(bytes: &[u8]) -> f64 {
+    let is_negative = bytes[0] == b'-';
+    let bytes = if is_negative { &bytes[1..] } else { bytes };
+
+    let mut period_idx = 0;
+    loop {
+        if bytes[period_idx] == b'.' {
+            break;
+        }
+        period_idx += 1;
+    }
+
+    let mut i = 0;
+    let mut result = 0;
+    let mut base = 10u64.pow((period_idx - 1) as u32);
+    while base >= 1 {
+        result += (bytes[i] - b'0') as u64 * base;
+        base /= 10;
+        i += 1;
+    }
+
+    let decimal = (bytes[period_idx + 1] - b'0') as f64 / 10.0;
+
+    if is_negative {
+        -(result as f64) - decimal
+    } else {
+        result as f64 + decimal
+    }
+}
+
+pub fn parse_lines<R: Read>(mut reader: BufReader<R>) -> Vec<StationAggregate> {
+    <unchanged>
+        let temp = parse_float_limited(&buf[split_idx + 1..bytes_read - 1]);
+    <unchanded>
+}
+```

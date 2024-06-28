@@ -54,9 +54,7 @@ pub fn parse_lines<R: Read>(mut reader: BufReader<R>) -> Vec<StationAggregate> {
         }
 
         let name = &buf[..split_idx];
-        let temp = String::from_utf8_lossy(&buf[split_idx + 1..bytes_read - 1])
-            .parse()
-            .expect("failed to parse temp");
+        let temp = parse_float_limited(&buf[split_idx + 1..bytes_read - 1]);
 
         if !results.contains_key(name.as_ref()) {
             results.insert(
@@ -114,6 +112,37 @@ pub fn parse_file_path() -> PathBuf {
     };
 
     PathBuf::from_str(path_str).expect("Failed to parse file path.")
+}
+
+#[inline]
+fn parse_float_limited(bytes: &[u8]) -> f64 {
+    let is_negative = bytes[0] == b'-';
+    let bytes = if is_negative { &bytes[1..] } else { bytes };
+
+    let mut period_idx = 0;
+    loop {
+        if bytes[period_idx] == b'.' {
+            break;
+        }
+        period_idx += 1;
+    }
+
+    let mut i = 0;
+    let mut result = 0;
+    let mut base = 10u64.pow((period_idx - 1) as u32);
+    while base >= 1 {
+        result += (bytes[i] - b'0') as u64 * base;
+        base /= 10;
+        i += 1;
+    }
+
+    let decimal = (bytes[period_idx + 1] - b'0') as f64 / 10.0;
+
+    if is_negative {
+        -(result as f64) - decimal
+    } else {
+        result as f64 + decimal
+    }
 }
 
 fn count_lines_read_to_buf(path: PathBuf) {
@@ -254,5 +283,12 @@ station3;-99.9
         ];
 
         assert_eq!(results, expected);
+    }
+
+    #[test]
+    fn can_parse_float_limited() {
+        let input = b"99.9";
+        let output = parse_float_limited(input);
+        assert_eq!(output, 99.9);
     }
 }
