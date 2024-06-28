@@ -8,7 +8,7 @@ use std::{
     time::Instant,
 };
 
-const BUFFER_SIZE: usize = 3 * 1024;
+const BUFFER_SIZE: usize = 1024 * 1024;
 
 fn main() {
     let path = parse_file_path();

@@ -65,3 +65,14 @@ fn parse_lines<R: Read>(reader: BufReader<R>) -> Vec<StationAggregate> {
     results
 }
 ```
+
+### Increasing the buffer size to 1MB (time: ~104 secs)
+
+My initial thought is that since reading is taking so long, whether increasing
+the buffer size dramatically will decrease the time spend on IO. There was some
+improvement of the overall runtime (~2 secs) but it's not as significant as I
+thought it would be.
+
+```rust
+const BUFFER_SIZE: usize = 1024 * 1024;
+```
