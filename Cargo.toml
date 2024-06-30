@@ -14,6 +14,10 @@ criterion = { version = "0.4", features = ["html_reports"] }
 name = "parse_lines"
 harness = false
 
+[[bench]]
+name = "custom_parse_float"
+harness = false
+
 [profile.bench]
 debug = true
 
