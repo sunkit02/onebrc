@@ -66,7 +66,7 @@ pub fn parse_lines<R: Read>(mut reader: BufReader<R>) -> Vec<StationAggregate> {
         }
 
         let name = &buf[..split_idx];
-        let temp = parse_float_limited(&buf[split_idx + 1..bytes_read - 1]);
+        let temp = custom_parse_float(&buf[split_idx + 1..bytes_read - 1]);
 
         let entry = results
             .entry(name.to_vec())
@@ -117,7 +117,7 @@ pub fn parse_file_path() -> PathBuf {
 }
 
 #[inline]
-fn parse_float_limited(bytes: &[u8]) -> f64 {
+pub fn custom_parse_float(bytes: &[u8]) -> f64 {
     let is_negative = bytes[0] == b'-';
     let bytes = if is_negative { &bytes[1..] } else { bytes };
 
@@ -290,7 +290,7 @@ station3;-99.9
     #[test]
     fn can_parse_float_limited() {
         let input = b"99.9";
-        let output = parse_float_limited(input);
+        let output = custom_parse_float(input);
         assert_eq!(output, 99.9);
     }
 }
