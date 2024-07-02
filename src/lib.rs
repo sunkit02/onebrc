@@ -74,7 +74,8 @@ pub fn parse_lines<R: Read>(mut reader: BufReader<R>) -> Vec<StationAggregate> {
 
         if temp < entry.min {
             entry.min = temp;
-        } else if temp > entry.max {
+        }
+        if temp > entry.max {
             entry.max = temp;
         }
         entry.total += temp;
@@ -289,8 +290,10 @@ station3;-99.9
 
     #[test]
     fn can_parse_float_limited() {
-        let input = b"99.9";
-        let output = custom_parse_float(input);
-        assert_eq!(output, 99.9);
+        let input = [(b"99.9".as_slice(), 99.9), (b"-99.9", -99.9), (b"0.0", 0.0)];
+        input.into_iter().for_each(|(bytes, expected)| {
+            let actual = custom_parse_float(bytes);
+            assert_eq!(actual, expected);
+        })
     }
 }
