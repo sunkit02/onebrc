@@ -1,16 +1,15 @@
-use std::{fs::File, io::BufReader, time::Instant};
+use std::time::Instant;
 
-use onebrc::{parse_file_path, parse_lines, process, BUFFER_SIZE};
+use onebrc::{parse_file_path, process};
 
 fn main() {
     let path = parse_file_path();
 
-    let file = File::open(&path).unwrap();
     // let reader = BufReader::with_capacity(BUFFER_SIZE, file);
 
     let start = Instant::now();
 
-    let _results = process(file, path);
+    let _results = process(path);
 
     println!("Took: {:?}", start.elapsed());
 

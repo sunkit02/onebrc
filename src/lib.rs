@@ -49,7 +49,9 @@ pub struct StationAggregate {
     pub mean: f64,
 }
 
-pub fn process(mut file: File, file_path: PathBuf) -> Vec<StationAggregate> {
+pub fn process(file_path: PathBuf) -> Vec<StationAggregate> {
+    let mut file = File::open(&file_path).unwrap();
+
     #[cfg(debug_assertions)]
     let line_count = Arc::new(AtomicU32::new(0));
 
